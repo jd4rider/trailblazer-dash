@@ -37,8 +37,10 @@ var _segment_index := 0
 var _paused := false
 var _overlay: Control
 var _rng := RandomNumberGenerator.new()
-var _touch_start := Vector2.ZERO
-var _touch_ms := 0
+var _pointer_down := false
+var _pointer_start := Vector2.ZERO
+var _pointer_ms := 0
+var _last_touch_ms := -1000
 var _tutorial_seen := false
 
 
@@ -139,7 +141,9 @@ func _build_player() -> void:
 	player.stumbled.connect(_on_stumble)
 	player.landed.connect(func() -> void:
 		if camera.has_method("shake"):
-			camera.call("shake", 0.25))
+			camera.call("shake", 0.25)
+		if camera.has_method("dip"):
+			camera.call("dip", 0.35))
 
 
 func _build_track() -> void:
@@ -183,7 +187,7 @@ func _show_ready() -> void:
 		14, Ui.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
 	var heading := Campaign.level_title(level) if mode == "campaign" else String(level.get("name", "Daily Route"))
 	column.add_child(Ui.title(heading, 32, Ui.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	column.add_child(Ui.label("Swipe or use the arrow keys. Jump the hurdles, slide under the bars, and never stop moving.",
+	column.add_child(Ui.label("Three lanes. Swipe left or right to hop between them, up to jump the hurdles and pits, down to slide under the bars. Pick a free lane before the trains.",
 		17, Ui.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
 	var controls := Ui.hbox(6)
 	controls.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -203,6 +207,7 @@ func _start_run() -> void:
 	if state != "ready":
 		return
 	state = "running"
+	Audio.kick()
 	Audio.play_sfx("gate", 1.0, -6.0)
 	player.call("reset_state")
 	player.set("active", true)
@@ -240,14 +245,19 @@ func _physics_process(delta: float) -> void:
 	distance += speed * delta
 
 	score += int(speed * delta * (2.0 if player.has_power("multiplier") else 1.0))
-	player.call("tick", delta, speed)
 	var player_z := -(distance - _segment_start)
+	# The trail bends, so the runner rides the same centreline the road, sparks and
+	# obstacles were laid out along.
+	player.set("graph_offset", track.curve_at(player_z))
+	player.set("bank_slope", track.curve_slope(player_z))
+	player.call("tick", delta, speed)
 	track.update(delta, player_z, player.has_power("relic_finder"))
 	# The runner and the camera stay put, so the world has to stream towards
 	# them: without this the road is a frozen picture and the character runs on
 	# the spot while the distance counter climbs.
 	track.position.z = distance - _segment_start
 	camera.call("set_speed_ratio", progress)
+	camera.call("set_curve", track.curve_slope(player_z))
 
 	_collect_sparks(player_z)
 	_collect_pickups(player_z)
@@ -288,14 +298,14 @@ func _collect_sparks(player_z: float) -> void:
 			continue
 		var node: Node3D = spark["node"]
 		if magnet and absf(z - player_z) < pull_radius:
-			var direction := Vector3(player.x, 0.9, player_z) - node.position
+			var direction := Vector3(player.position.x, 0.9, player_z) - node.position
 			if direction.length() > 0.15:
 				node.position += direction.normalized() * minf(direction.length(), 14.0 * get_physics_process_delta_time())
 			spark["z"] = node.position.z
 			z = node.position.z
 		if absf(z - player_z) > 1.0:
 			continue
-		if absf(node.position.x - player.x) > 1.05:
+		if absf(node.position.x - player.position.x) > 1.05:
 			continue
 		track.collect_spark(spark)
 		var value := 2 if player.has_power("multiplier") else 1
@@ -310,7 +320,7 @@ func _collect_pickups(player_z: float) -> void:
 			continue
 		if absf(float(pickup["z"]) - player_z) > 1.05:
 			continue
-		if absf(float(pickup["x"]) - player.x) > 1.1:
+		if absf(float(pickup["x"]) - player.position.x) > 1.1:
 			continue
 		track.take_pickup(pickup)
 		var type := String(pickup["type"])
@@ -327,7 +337,7 @@ func _collect_pickups(player_z: float) -> void:
 			continue
 		if absf(float(relic["z"]) - player_z) > 1.05:
 			continue
-		if absf(float(relic["x"]) - player.x) > 1.15:
+		if absf(float(relic["x"]) - player.position.x) > 1.15:
 			continue
 		track.take_relic(relic)
 		relics += 1
@@ -337,14 +347,23 @@ func _collect_pickups(player_z: float) -> void:
 
 
 func _check_hazards(player_z: float) -> void:
+	# Compare lane offsets rather than world X: on a curved trail the whole lane
+	# slides sideways in world space, but the lane the runner occupies does not.
+	var lane_offset := player.position.x - track.curve_at(player_z)
 	for hazard in track.hazards:
 		if hazard["hit"]:
 			continue
 		var z := float(hazard["z"])
-		if absf(z - player_z) > 1.05:
+		var reach := float(hazard.get("len", 0.0))
+		if reach > 0.0:
+			# Long hazards (trains) are a stretch of lane, not a thin plane.
+			if player_z > z + 0.7 or player_z < z - reach - 0.7:
+				continue
+		elif absf(z - player_z) > 1.05:
 			continue
-		if absf(Playfield.lane_x(int(hazard["lane"])) - player.x) > 1.06:
-			continue
+		if not bool(hazard.get("wide", false)):
+			if absf(Playfield.lane_x(int(hazard["lane"])) - lane_offset) > 1.06:
+				continue
 		var feet := player.y
 		var head := player.y + player.height()
 		if head <= float(hazard["bottom"]) or feet >= float(hazard["top"]):
@@ -353,6 +372,11 @@ func _check_hazards(player_z: float) -> void:
 			continue
 		hazard["hit"] = true
 		track.hide_hazard(hazard)
+		if bool(hazard.get("fatal", false)):
+			Audio.play_sfx("hit", 0.72, 2.0)
+			camera.call("shake", 3.0)
+			_fail_run()
+			return
 		var result := String(player.call("take_hit"))
 		if result == "ignored":
 			continue
@@ -647,25 +671,56 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
-		if touch.pressed:
-			_touch_start = touch.position
-			_touch_ms = Time.get_ticks_msec()
-		else:
-			var tap_delta: Vector2 = touch.position - _touch_start
-			if tap_delta.length() < 28.0 and Time.get_ticks_msec() - _touch_ms < 280:
-				player.call("jump")
-			else:
-				_swipe(tap_delta)
+		_pointer(touch.position, touch.pressed, true)
 	elif event is InputEventScreenDrag:
-		var drag := event as InputEventScreenDrag
-		var drag_delta: Vector2 = drag.position - _touch_start
-		if drag_delta.length() > 46.0:
-			_swipe(drag_delta)
-			_touch_start = drag.position
+		_pointer_move((event as InputEventScreenDrag).position)
+	elif event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		# Godot's web build also mirrors a finger as a mouse press; ignore the
+		# duplicate so one swipe cannot fire twice or reset itself.
+		if button.button_index == MOUSE_BUTTON_LEFT and Time.get_ticks_msec() - _last_touch_ms > 150:
+			_pointer(button.position, button.pressed, false)
+	elif event is InputEventMouseMotion:
+		var motion := event as InputEventMouseMotion
+		if (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0 and Time.get_ticks_msec() - _last_touch_ms > 150:
+			_pointer_move(motion.position)
+
+
+func _pointer(position: Vector2, pressed: bool, is_touch: bool) -> void:
+	if is_touch:
+		_last_touch_ms = Time.get_ticks_msec()
+	if pressed:
+		# The top strip belongs to the HUD: a tap on pause must not also jump.
+		if position.y < 130.0:
+			_pointer_down = false
+			return
+		_pointer_down = true
+		_pointer_start = position
+		_pointer_ms = Time.get_ticks_msec()
+		return
+	if not _pointer_down:
+		return
+	_pointer_down = false
+	var delta := position - _pointer_start
+	if delta.length() < 26.0 and Time.get_ticks_msec() - _pointer_ms < 300:
+		player.call("jump")
+	else:
+		_swipe(delta)
+
+
+func _pointer_move(position: Vector2) -> void:
+	if not _pointer_down:
+		return
+	var delta := position - _pointer_start
+	if delta.length() < Playfield.SWIPE_THRESHOLD:
+		return
+	_swipe(delta)
+	# Continue from here: one long drag can cross two lanes.
+	_pointer_start = position
 
 
 func _swipe(delta: Vector2) -> void:
-	if absf(delta.x) > absf(delta.y):
+	if absf(delta.x) > absf(delta.y) * 0.85:
 		_move(1 if delta.x > 0.0 else -1)
 	elif delta.y < 0.0:
 		player.call("jump")

@@ -126,8 +126,14 @@ func _build() -> void:
 	add_child(distance_wrap)
 
 	_flash = Ui.label("", 30, Ui.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
-	_flash.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_flash.position.y = 240
+	# A centre-top preset is zero-width, which wrapped every flash one letter per
+	# line; span the screen instead and keep the text on one line.
+	_flash.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_flash.offset_left = 20
+	_flash.offset_right = -20
+	_flash.offset_top = 236
+	_flash.offset_bottom = 300
+	_flash.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_flash.modulate.a = 0.0
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_flash)

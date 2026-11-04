@@ -21,7 +21,9 @@ var _intensity := 0.35
 var _amb_a: AudioStreamPlayer
 var _amb_b: AudioStreamPlayer
 var _amb_active: AudioStreamPlayer
+var _amb_base: AudioStreamPlayer
 var _amb_name := ""
+var _kicked := false
 
 
 func _ready() -> void:
@@ -44,12 +46,41 @@ func _ready() -> void:
 		player.volume_db = SILENT_DB
 		add_child(player)
 	_amb_active = _amb_a
+	# A quiet always-on air bed underneath the regional ambience, so a level is
+	# never silent if its region bed is subtle.
+	_amb_base = AudioStreamPlayer.new()
+	_amb_base.bus = "Master"
+	_amb_base.volume_db = SILENT_DB
+	add_child(_amb_base)
+	var wind := _looped(AMB_DIR + "wind.wav")
+	if wind != null:
+		_amb_base.stream = wind
+		_amb_base.volume_db = linear_to_db(maxf(0.02, music_volume)) - 21.0
+		_amb_base.play()
+
+
+## Browsers hold WebAudio suspended until a real gesture, which silences every
+## player started before the first tap. Called from the run once the player has
+## pressed start.
+func kick() -> void:
+	if _kicked:
+		return
+	_kicked = true
+	for player in _music.values():
+		var layer := player as AudioStreamPlayer
+		if layer.stream != null:
+			layer.play()
+	for player in [_amb_active, _amb_base]:
+		if player != null and player.stream != null:
+			player.play()
 
 
 func apply_settings(settings: Dictionary) -> void:
 	music_volume = clampf(float(settings.get("music", 0.7)), 0.0, 1.0)
 	sfx_volume = clampf(float(settings.get("sfx", 0.85)), 0.0, 1.0)
 	_apply_music_levels()
+	if _amb_base != null and _amb_base.stream != null:
+		_amb_base.volume_db = linear_to_db(maxf(0.02, music_volume)) - 21.0
 
 
 func _stream(path: String) -> AudioStream:
@@ -155,7 +186,7 @@ func play_ambience(name: String) -> void:
 	_amb_active = incoming
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(incoming, "volume_db", linear_to_db(maxf(0.02, music_volume)) - 12.0, 1.6)
+	tween.tween_property(incoming, "volume_db", linear_to_db(maxf(0.02, music_volume)) - 8.0, 1.6)
 	tween.tween_property(outgoing, "volume_db", SILENT_DB, 1.6)
 	tween.chain().tween_callback(func() -> void: outgoing.stop())
 

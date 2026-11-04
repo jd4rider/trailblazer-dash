@@ -25,6 +25,11 @@ var shield_charges := 0
 var hits := 0
 var active := true
 
+## Set by Run every tick: where the trail's centre is, and how hard it bends.
+var graph_offset := 0.0
+var bank_slope := 0.0
+var lean := 0.0
+
 var _target_x := 0.0
 var _slide_left := 0.0
 var _invuln := 0.0
@@ -116,6 +121,11 @@ func reset_state() -> void:
 	_double_jump_ready = false
 	_powers.clear()
 	active = true
+	graph_offset = 0.0
+	bank_slope = 0.0
+	lean = 0.0
+	if model:
+		model.rotation.z = 0.0
 	position = Vector3.ZERO
 	_play("Run", 1.0)
 
@@ -135,7 +145,13 @@ func tick(delta: float, speed: float) -> void:
 				_powers.erase(id)
 
 	x = move_toward(x, _target_x, Playfield.LANE_CHANGE_SPEED * delta)
-	position.x = x
+	position.x = x + graph_offset
+	# Bank into lane changes and lean with the bend of the trail.
+	var lateral := _target_x - x
+	var want_lean := clampf(lateral * 0.14 + bank_slope * 0.55, -0.24, 0.24)
+	lean = lerpf(lean, want_lean, 1.0 - exp(-delta * 9.0))
+	if model != null:
+		model.rotation.z = lean
 
 	if airborne:
 		vy += Playfield.GRAVITY * delta

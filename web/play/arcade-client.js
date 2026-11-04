@@ -25,7 +25,7 @@
   var script = document.currentScript || document.querySelector('script[data-game-id]')
   var GAME_ID = (script && script.dataset.gameId) || window.LJA_GAME_ID || 'unknown'
   var API = (script && script.dataset.supabaseUrl) || window.LJA_SUPABASE_URL || 'https://fqovramltegcfiyebyrt.supabase.co'
-  var ANON = (script && script.dataset.anonKey) || window.LJA_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxb3ZyYW1sdGVnY2ZpeWVieXJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODk2ODcsImV4cCI6MjEwOTE2NTY4N30.q4sloqvE4VDSF7WCI2P7G5Wj9rxxi3ZkZTU_wX6M7YI'
+  var ANON = (script && script.dataset.anonKey) || window.LJA_SUPABASE_ANON_KEY || '__LJA_ANON_KEY__'
   var CONFIGURED = ANON.indexOf('__LJA_') !== 0 && ANON.length > 40
 
   var SESSION_KEY = 'lja:session'

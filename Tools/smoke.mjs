@@ -74,6 +74,31 @@ for (const config of configs) {
 	await page.keyboard.press('ArrowUp')
 	await page.waitForTimeout(2500)
 	await page.screenshot({ path: `/tmp/tb-shots/${config.name}-4-later.png` })
+
+	// Real finger swipes through CDP: Godot's web export listens for touch, and
+	// emulated mouse drags alone would not catch a touch-only regression.
+	const cdp = await context.newCDPSession(page)
+	const swipe = async ([x0, y0], [x1, y1]) => {
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y: y0 }] })
+		for (let step = 1; step <= 8; step += 1) {
+			await cdp.send('Input.dispatchTouchEvent', {
+				type: 'touchMove',
+				touchPoints: [{ x: x0 + ((x1 - x0) * step) / 8, y: y0 + ((y1 - y0) * step) / 8 }],
+			})
+			await page.waitForTimeout(16)
+		}
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+	}
+	const beforeSwipe = await page.screenshot({ path: `/tmp/tb-shots/${config.name}-5-before-swipe.png` })
+	await swipe([config.width * 0.5, config.height * 0.74], [config.width * 0.18, config.height * 0.74])
+	await page.waitForTimeout(420)
+	const afterSwipe = await page.screenshot({ path: `/tmp/tb-shots/${config.name}-6-after-left-swipe.png` })
+	if (Buffer.compare(beforeSwipe, afterSwipe) === 0) failures.push(`${config.name}: left swipe changed nothing on screen`)
+	await swipe([config.width * 0.5, config.height * 0.72], [config.width * 0.5, config.height * 0.4])
+	await page.waitForTimeout(260)
+	await page.screenshot({ path: `/tmp/tb-shots/${config.name}-7-after-up-swipe.png` })
+	await page.waitForTimeout(2200)
+	await page.screenshot({ path: `/tmp/tb-shots/${config.name}-8-swiped.png` })
 	// Two frames a second apart: the trail must visibly move, not sit still.
 	const before = await page.screenshot()
 	await page.waitForTimeout(1100)

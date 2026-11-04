@@ -23,6 +23,9 @@ const PLAYER_DEPTH := 0.42
 const CAMERA_BASE_FOV := 66.0
 const CAMERA_SPEED_FOV := 78.0
 
+## A finger has to travel this far before it counts as a swipe rather than a tap.
+const SWIPE_THRESHOLD := 38.0
+
 
 static func lane_x(lane: int) -> float:
 	return float(clamp(lane, -1, 1)) * LANE_WIDTH

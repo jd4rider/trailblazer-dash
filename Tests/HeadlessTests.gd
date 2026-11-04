@@ -19,6 +19,7 @@ func check(condition: bool, message: String) -> void:
 func _ready() -> void:
 	await get_tree().process_frame
 	_test_campaign()
+	_test_track_extras()
 	_test_save()
 	await _test_run_scene("campaign", 1)
 	await _test_run_scene("endless", 0)
@@ -87,6 +88,45 @@ func _test_campaign() -> void:
 	check(float(daily.get("len", 0)) > 300.0, "daily level has a real length")
 
 
+func _count_kind(hazards: Array, kind: String) -> int:
+	var total := 0
+	for hazard in hazards:
+		if String(hazard["kind"]) == kind:
+			total += 1
+	return total
+
+
+## Trains, pits and the curving trail are built at runtime rather than living in
+## the campaign JSON, so they get their own checks on real levels.
+func _test_track_extras() -> void:
+	var trains := 0
+	var gaps := 0
+	for id in [31, 120, 260, 400]:
+		var entry := Campaign.level(id)
+		check(not entry.is_empty(), "level %d exists for the track checks" % id)
+		var track := TrackBuilder.new()
+		add_child(track)
+		track.build(entry, Campaign.region(int(entry.get("region", 1))))
+		trains += _count_kind(track.hazards, "t")
+		gaps += _count_kind(track.hazards, "g")
+		for hazard in track.hazards:
+			check(is_finite(float(hazard["z"])), "level %d hazard z is finite" % id)
+			check(float(hazard["top"]) > float(hazard["bottom"]), "level %d hazard has a hit band" % id)
+			# Every lane-bound hazard must sit exactly on the trail's lane centre at
+			# its own Z, or a curve would put obstacles between the lanes.
+			if String(hazard["kind"]) == "t" or bool(hazard.get("wide", false)):
+				continue
+			var expected := float(track.call("curve_at", float(hazard["z"]))) + Playfield.lane_x(int(hazard["lane"]))
+			check(absf(expected - float(hazard["x"])) < 0.01,
+				"level %d hazard sits on its lane" % id)
+		for i in range(60):
+			var offset := absf(float(track.call("curve_at", -8.0 * i)))
+			check(offset < 14.0, "level %d trail stays inside the playfield" % id)
+		track.queue_free()
+	check(trains > 0, "trains are placed on some levels")
+	check(gaps > 0, "pits are placed on some levels")
+
+
 func _test_save() -> void:
 	var before := Save.total_stars()
 	check(before >= 0, "stars are readable")
@@ -131,10 +171,29 @@ func _test_run_scene(mode: String, level_id: int) -> void:
 	var track = run.get("track")
 	check(track.hazards.size() > 0, "%s run has obstacles" % mode)
 	check(track.sparks.size() > 0, "%s run has sparks" % mode)
+	check(track.has_method("curve_at"), "%s track exposes its curve" % mode)
+	check(track.has_method("curve_slope"), "%s track exposes its slope" % mode)
 	run.call("_start_run")
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var distance := float(run.get("distance"))
 	check(distance > 0.0, "%s run advances distance" % mode)
+	# Input mapping: the same touch path a finger takes, so a broken swipe shows
+	# up here rather than only on a phone.
+	var runner = run.get("player")
+	check(not bool(runner.get("airborne")), "%s runner starts grounded" % mode)
+	run.call("_pointer", Vector2(220.0, 620.0), true, true)
+	run.call("_pointer_move", Vector2(130.0, 618.0))
+	await get_tree().physics_frame
+	check(int(runner.get("lane")) == -1, "%s swipe left changes lane" % mode)
+	run.call("_pointer", Vector2(220.0, 620.0), true, true)
+	run.call("_pointer_move", Vector2(222.0, 500.0))
+	check(bool(runner.get("airborne")), "%s swipe up jumps" % mode)
+	await get_tree().physics_frame
+	run.call("_pointer", Vector2(220.0, 620.0), true, true)
+	run.call("_pointer_move", Vector2(230.0, 730.0))
+	check(bool(runner.get("sliding")), "%s swipe down slides" % mode)
+	var world_x := float(runner.get("position").x)
+	check(is_finite(world_x), "%s runner world position is finite" % mode)
 	run.queue_free()
 	await get_tree().process_frame
