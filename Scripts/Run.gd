@@ -40,6 +40,10 @@ var _rng := RandomNumberGenerator.new()
 var _pointer_down := false
 var _pointer_start := Vector2.ZERO
 var _pointer_ms := 0
+## One gesture performs one action. Without this a single long drag chained a
+## lane change every 38 px and the runner felt wildly out of control.
+var _gesture_consumed := false
+var _gesture_axis := ""
 var _last_touch_ms := -1000
 var _tutorial_seen := false
 
@@ -716,35 +720,58 @@ func _pointer(position: Vector2, pressed: bool, is_touch: bool) -> void:
 		_pointer_down = true
 		_pointer_start = position
 		_pointer_ms = Time.get_ticks_msec()
+		_gesture_consumed = false
+		_gesture_axis = ""
 		return
 	if not _pointer_down:
 		return
 	_pointer_down = false
+	_gesture_axis = ""
+	# A swipe that already moved him must not also jump when the thumb lifts.
+	if _gesture_consumed:
+		_gesture_consumed = false
+		return
 	var delta := position - _pointer_start
-	if delta.length() < 26.0 and Time.get_ticks_msec() - _pointer_ms < 300:
+	if delta.length() < Playfield.TAP_SLOP and Time.get_ticks_msec() - _pointer_ms < 260:
 		player.call("jump")
-	else:
-		_swipe(delta)
+		return
+	# Some browsers deliver only the release, so a long, clean release still
+	# counts as one swipe.
+	_swipe(delta, _axis_of(delta))
 
 
 func _pointer_move(position: Vector2) -> void:
-	if not _pointer_down:
+	if not _pointer_down or _gesture_consumed:
 		return
 	var delta := position - _pointer_start
 	if delta.length() < Playfield.SWIPE_THRESHOLD:
 		return
-	_swipe(delta)
-	# Continue from here: one long drag can cross two lanes.
-	_pointer_start = position
+	# Lock the axis once per gesture. On an ambiguous diagonal nothing happens
+	# yet: the next drag event decides rather than guessing and doing both.
+	var axis := _axis_of(delta)
+	if axis.is_empty():
+		return
+	_gesture_consumed = true
+	_gesture_axis = axis
+	_swipe(delta, axis)
 
 
-func _swipe(delta: Vector2) -> void:
-	if absf(delta.x) > absf(delta.y) * 0.85:
+func _axis_of(delta: Vector2) -> String:
+	if absf(delta.x) >= absf(delta.y) * Playfield.SWIPE_AXIS_RATIO:
+		return "x"
+	if absf(delta.y) >= absf(delta.x) * Playfield.SWIPE_AXIS_RATIO:
+		return "y"
+	return ""
+
+
+func _swipe(delta: Vector2, axis: String) -> void:
+	if axis == "x":
 		_move(1 if delta.x > 0.0 else -1)
-	elif delta.y < 0.0:
-		player.call("jump")
-	else:
-		player.call("slide")
+	elif axis == "y":
+		if delta.y < 0.0:
+			player.call("jump")
+		else:
+			player.call("slide")
 
 
 func _move(direction: int) -> void:

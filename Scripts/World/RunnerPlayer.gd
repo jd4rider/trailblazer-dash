@@ -231,7 +231,16 @@ func _play(clip: String, speed_scale: float) -> void:
 	anim.speed_scale = speed_scale
 
 
+## True while he is still sliding across to his chosen lane. Lane changes, jumps
+## and slides are all refused during that window: it keeps a fast player to one
+## lane per swipe and stops a jump firing out of a hop.
+func is_changing_lane() -> bool:
+	return absf(_target_x - x) > 0.12
+
+
 func move_lane(direction: int) -> bool:
+	if is_changing_lane():
+		return false
 	var next := clampi(lane + direction, -1, 1)
 	if next == lane:
 		return false
@@ -241,7 +250,7 @@ func move_lane(direction: int) -> bool:
 
 
 func jump() -> bool:
-	if not active:
+	if not active or is_changing_lane():
 		return false
 	if not airborne:
 		vy = Playfield.JUMP_VELOCITY
@@ -261,7 +270,7 @@ func jump() -> bool:
 
 
 func slide() -> bool:
-	if not active or sliding:
+	if not active or sliding or is_changing_lane():
 		return false
 	if airborne:
 		# Land fast, then slide: keeps input forgiving without teleporting.

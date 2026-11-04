@@ -28,7 +28,13 @@ const CAMERA_BASE_FOV := 66.0
 const CAMERA_SPEED_FOV := 78.0
 
 ## A finger has to travel this far before it counts as a swipe rather than a tap.
-const SWIPE_THRESHOLD := 38.0
+## Too low and a normal thumb wobble reads as a flick.
+const SWIPE_THRESHOLD := 48.0
+## A drag counts as horizontal only when it is clearly wider than it is tall, so
+## a diagonal flick cannot both change lane and jump.
+const SWIPE_AXIS_RATIO := 1.35
+## Movement under this is a tap (jump), not a swipe.
+const TAP_SLOP := 24.0
 
 
 static func lane_x(lane: int) -> float:

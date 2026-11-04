@@ -171,6 +171,8 @@ func _test_track_extras() -> void:
 	check(gaps > 0, "pits are placed on some levels")
 	check(Playfield.LANE_WIDTH >= 2.8, "lanes are wide enough for three columns")
 	check(Playfield.TRACK_WIDTH >= Playfield.LANE_WIDTH * 3.0, "the deck spans all three lanes")
+	check(Playfield.SWIPE_THRESHOLD >= 44.0, "the swipe threshold is not twitchy")
+	check(Playfield.SWIPE_AXIS_RATIO > 1.0, "a swipe locks to one axis")
 
 
 func _test_save() -> void:
@@ -188,6 +190,13 @@ func _test_save() -> void:
 	for id in PowerUps.ORDER:
 		check(PowerUps.exists(id), "power-up %s exists" % id)
 		check(PowerUps.display_name(id) != id, "power-up %s has a display name" % id)
+
+
+func _settle_lane(run: Node, runner: Node) -> void:
+	for i in range(90):
+		if not bool(runner.call("is_changing_lane")):
+			return
+		await get_tree().physics_frame
 
 
 func _test_run_scene(mode: String, level_id: int) -> void:
@@ -236,17 +245,44 @@ func _test_run_scene(mode: String, level_id: int) -> void:
 	var blockers := _pointer_blockers(hud, Vector2(view_size.x * 0.5, view_size.y * 0.66))
 	check(blockers.is_empty(), "%s HUD lets swipes through (%s)" % [mode, ", ".join(blockers)])
 	check(not bool(runner.get("airborne")), "%s runner starts grounded" % mode)
+	# One gesture, one lane.
 	run.call("_pointer", Vector2(220.0, 620.0), true, true)
 	run.call("_pointer_move", Vector2(130.0, 618.0))
 	await get_tree().physics_frame
 	check(int(runner.get("lane")) == -1, "%s swipe left changes lane" % mode)
+	# A single continuous drag used to chain a lane change every 38 px.
+	for step in range(8):
+		run.call("_pointer_move", Vector2(130.0 + 40.0 * (step + 1), 618.0))
+	check(int(runner.get("lane")) == -1, "%s a long drag moves only one lane" % mode)
+	run.call("_pointer", Vector2(450.0, 618.0), false, true)
+	await _settle_lane(run, runner)
+	# Flicking up mid-hop must not fire a jump.
+	run.call("_pointer", Vector2(220.0, 620.0), true, true)
+	run.call("_pointer_move", Vector2(300.0, 619.0))
+	run.call("_pointer", Vector2(300.0, 619.0), false, true)
+	run.call("_pointer", Vector2(220.0, 620.0), true, true)
+	run.call("_pointer_move", Vector2(222.0, 500.0))
+	check(not bool(runner.get("airborne")), "%s cannot jump while changing lane" % mode)
+	run.call("_pointer", Vector2(222.0, 500.0), false, true)
+	await _settle_lane(run, runner)
+	check(int(runner.get("lane")) == 0, "%s swipe right returns to the centre" % mode)
+	# An ambiguous diagonal does nothing rather than guessing.
+	run.call("_pointer", Vector2(220.0, 620.0), true, true)
+	run.call("_pointer_move", Vector2(260.0, 582.0))
+	await get_tree().physics_frame
+	check(int(runner.get("lane")) == 0 and not bool(runner.get("airborne")), "%s diagonal drag does nothing" % mode)
+	run.call("_pointer", Vector2(260.0, 582.0), false, true)
+	await _settle_lane(run, runner)
+	# Up jumps, once the hop has settled.
 	run.call("_pointer", Vector2(220.0, 620.0), true, true)
 	run.call("_pointer_move", Vector2(222.0, 500.0))
 	check(bool(runner.get("airborne")), "%s swipe up jumps" % mode)
+	run.call("_pointer", Vector2(222.0, 500.0), false, true)
 	await get_tree().physics_frame
 	run.call("_pointer", Vector2(220.0, 620.0), true, true)
 	run.call("_pointer_move", Vector2(230.0, 730.0))
 	check(bool(runner.get("sliding")), "%s swipe down slides" % mode)
+	run.call("_pointer", Vector2(230.0, 730.0), false, true)
 	var world_x := float(runner.get("position").x)
 	check(is_finite(world_x), "%s runner world position is finite" % mode)
 	run.queue_free()

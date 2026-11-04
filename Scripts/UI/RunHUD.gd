@@ -138,6 +138,9 @@ func _build() -> void:
 	_flash.offset_top = 236
 	_flash.offset_bottom = 300
 	_flash.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_flash.modulate.a = 0.0
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_flash)
 	# Any non-button Control left on the default mouse filter silently swallows
 	# swipes over the playfield, so the whole HUD is made click-through.
 	_ignore_pointer(self)
@@ -148,9 +151,6 @@ func _ignore_pointer(node: Node) -> void:
 		if child is Control and not (child is BaseButton):
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_ignore_pointer(child)
-	_flash.modulate.a = 0.0
-	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_flash)
 
 
 func set_objective(level: Dictionary) -> void:
