@@ -177,16 +177,24 @@ func _build_ui() -> void:
 	shade.custom_minimum_size = Vector2(0, 400)
 	screen.add_child(shade)
 
-	# A full-rect column pinned to the bottom. Anchoring a container to a
-	# zero-height rect on the bottom edge pushed every button off-screen.
+	# A full-rect column pinned to the bottom, inside a scroll view. In the
+	# arcade's shorter iframe the stack is taller than the frame, and a plain
+	# VBox compresses its rows until they overlap.
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 18
+	scroll.offset_right = -18
+	scroll.offset_bottom = -24
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	screen.add_child(scroll)
+
 	var column := Ui.vbox(8)
-	column.set_anchors_preset(Control.PRESET_FULL_RECT)
 	column.alignment = BoxContainer.ALIGNMENT_END
-	column.offset_left = 18
-	column.offset_right = -18
-	column.offset_bottom = -26
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.mouse_filter = Control.MOUSE_FILTER_PASS
-	screen.add_child(column)
+	scroll.add_child(column)
 
 	var title := Ui.title("TRAILBLAZER", 62, Ui.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_constant_override("outline_size", 14)

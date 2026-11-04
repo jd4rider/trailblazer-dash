@@ -17,6 +17,8 @@ const url = process.argv[2] || 'http://127.0.0.1:4173/'
 const configs = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'small', width: 360, height: 800 },
+  // The arcade wraps the game in a header and footer, leaving about 740px.
+  { name: 'arcade-frame', width: 390, height: 740 },
 ]
 
 const failures = []
