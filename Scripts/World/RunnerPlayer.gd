@@ -50,6 +50,7 @@ func _build_model(character_id: String) -> void:
 	var packed: PackedScene = load(path)
 	model = packed.instantiate() as Node3D
 	model.name = "Model"
+	model.scale = Vector3.ONE * 1.15
 	# Blender authors the character facing -Y, which becomes +Z in glTF.
 	model.rotation.y = PI
 	add_child(model)

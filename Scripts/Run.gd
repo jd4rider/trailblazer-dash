@@ -147,6 +147,7 @@ func _build_track() -> void:
 	track.name = "Track"
 	add_child(track)
 	track.build(level, region)
+	track.position.z = 0.0
 
 
 func _build_ui() -> void:
@@ -242,6 +243,10 @@ func _physics_process(delta: float) -> void:
 	player.call("tick", delta, speed)
 	var player_z := -(distance - _segment_start)
 	track.update(delta, player_z, player.has_power("relic_finder"))
+	# The runner and the camera stay put, so the world has to stream towards
+	# them: without this the road is a frozen picture and the character runs on
+	# the spot while the distance counter climbs.
+	track.position.z = distance - _segment_start
 	camera.call("set_speed_ratio", progress)
 
 	_collect_sparks(player_z)
@@ -373,6 +378,7 @@ func _extend_endless() -> void:
 	track = TrackBuilder.new()
 	add_child(track)
 	track.build(level, region)
+	track.position.z = 0.0
 	hud.flash_text("New country · %s" % Campaign.region_name(int(region.get("id", 1))), Ui.CREAM)
 	Audio.play_sfx("gate", 0.95, -6.0)
 

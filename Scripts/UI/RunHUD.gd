@@ -69,8 +69,10 @@ func _build() -> void:
 
 	var stats := Ui.hbox(8)
 	var score_card := Ui.inset(Color(0.05, 0.09, 0.1, 0.55), 14)
-	_score_label = Ui.label("0", 26, Ui.CREAM)
-	score_card.add_child(_score_label)
+	_score_label = Ui.label("0", 24, Ui.CREAM)
+	var score_pad := Ui.margin(12, 4, 12, 4)
+	score_pad.add_child(_score_label)
+	score_card.add_child(score_pad)
 	stats.add_child(score_card)
 
 	var spark_card := Ui.inset(Color(0.05, 0.09, 0.1, 0.55), 14)
@@ -78,17 +80,23 @@ func _build() -> void:
 	spark_row.add_child(StarIcon.make(true, 18.0, Ui.GOLD))
 	_spark_label = Ui.label("0", 22, Ui.CREAM)
 	spark_row.add_child(_spark_label)
-	spark_card.add_child(spark_row)
+	var spark_pad := Ui.margin(12, 4, 12, 4)
+	spark_pad.add_child(spark_row)
+	spark_card.add_child(spark_pad)
 	stats.add_child(spark_card)
 
 	var relic_card := Ui.inset(Color(0.05, 0.09, 0.1, 0.55), 14)
-	_relic_label = Ui.label("REL 0", 18, Color("#d9c6ff"))
-	relic_card.add_child(_relic_label)
+	_relic_label = Ui.label("REL 0", 17, Color("#d9c6ff"))
+	var relic_pad := Ui.margin(12, 4, 12, 4)
+	relic_pad.add_child(_relic_label)
+	relic_card.add_child(relic_pad)
 	stats.add_child(relic_card)
 
 	var hearts_card := Ui.inset(Color(0.05, 0.09, 0.1, 0.55), 14)
-	_hearts_label = Ui.label("LIVES 3", 18, Ui.CORAL)
-	hearts_card.add_child(_hearts_label)
+	_hearts_label = Ui.label("LIVES 3", 17, Ui.CORAL)
+	var hearts_pad := Ui.margin(12, 4, 12, 4)
+	hearts_pad.add_child(_hearts_label)
+	hearts_card.add_child(hearts_pad)
 	stats.add_child(hearts_card)
 	for card in [score_card, spark_card, relic_card, hearts_card]:
 		(card as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -98,7 +106,9 @@ func _build() -> void:
 	var objective_card := Ui.inset(Color(0.06, 0.11, 0.12, 0.5), 14)
 	objective_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_objective_label = Ui.label(objective_text, 16, Ui.CREAM)
-	objective_card.add_child(_objective_label)
+	var objective_pad := Ui.margin(12, 4, 12, 4)
+	objective_pad.add_child(_objective_label)
+	objective_card.add_child(objective_pad)
 	column.add_child(objective_card)
 
 	_power_row = Ui.hbox(6)

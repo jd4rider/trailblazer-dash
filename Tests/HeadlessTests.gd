@@ -123,6 +123,11 @@ func _test_run_scene(mode: String, level_id: int) -> void:
 	check(run.get("level") != null and not (run.get("level") as Dictionary).is_empty(), "%s run resolves a level" % mode)
 	check(run.get("track") != null, "%s run builds a track" % mode)
 	check(run.get("player") != null, "%s run builds a player" % mode)
+	# A parse error in the HUD used to leave the counters missing while every
+	# other assertion still passed, so check the HUD and its labels exist.
+	var hud = run.get("hud")
+	check(hud != null and hud.has_method("update_state"), "%s run builds a working HUD" % mode)
+	check(hud != null and hud.get("_objective_label") != null, "%s HUD has its objective label" % mode)
 	var track = run.get("track")
 	check(track.hazards.size() > 0, "%s run has obstacles" % mode)
 	check(track.sparks.size() > 0, "%s run has sparks" % mode)

@@ -139,7 +139,7 @@ func _build_tiles() -> void:
 
 		var deck := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = Vector3(9.0, 0.5, 20.0)
+		box.size = Vector3(8.4, 0.5, 20.0)
 		deck.mesh = box
 		deck.position = Vector3(0, -0.25, z)
 		deck.material_override = _tile_materials["tile_ground"]
@@ -150,7 +150,7 @@ func _build_tiles() -> void:
 			var rail_box := BoxMesh.new()
 			rail_box.size = Vector3(0.6, 0.7, 20.0)
 			rail.mesh = rail_box
-			rail.position = Vector3(side * 4.7, 0.1, z)
+			rail.position = Vector3(side * 4.2, 0.1, z)
 			rail.material_override = _tile_materials["tile_edge"]
 			tile.add_child(rail)
 
@@ -209,7 +209,7 @@ func _build_sparks() -> void:
 				continue
 			var z := -(base_z + i * 1.7)
 			node.position = Vector3(Playfield.lane_x(lane), 0.85, z)
-			node.scale = Vector3.ONE * 1.25
+			node.scale = Vector3.ONE * 0.8
 			_paint(node, Color("#ffd166"), 0.9)
 			sparks.append({
 				"node": node,

@@ -72,8 +72,13 @@ for (const config of configs) {
 	await page.keyboard.press('ArrowLeft')
 	await page.waitForTimeout(600)
 	await page.keyboard.press('ArrowUp')
-	await page.waitForTimeout(4000)
+	await page.waitForTimeout(2500)
 	await page.screenshot({ path: `/tmp/tb-shots/${config.name}-4-later.png` })
+	// Two frames a second apart: the trail must visibly move, not sit still.
+	const before = await page.screenshot()
+	await page.waitForTimeout(1100)
+	const after = await page.screenshot()
+	if (Buffer.compare(before, after) === 0) failures.push(`${config.name}: the run frame is completely static`)
 
   console.log(config.name, JSON.stringify(state))
   await context.close()
@@ -81,6 +86,13 @@ for (const config of configs) {
 await browser.close()
 
 if (errors.length) console.log('page errors:\n' + errors.slice(0, 12).join('\n'))
+// Godot prints script failures to the browser console; those are real defects,
+// so the build fails rather than only logging them.
+for (const message of errors) {
+  if (/SCRIPT ERROR|Parse Error|not found in base|Cannot get property/.test(message)) {
+    failures.push('script failure: ' + message)
+  }
+}
 if (failures.length) {
   console.log('FAIL\n' + failures.join('\n'))
   process.exit(1)
