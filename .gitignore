@@ -1,0 +1,20 @@
+# Godot editor + import cache
+.godot/
+*.import.bak
+
+# Web export artifacts (rebuilt by CI and by `Tools/export.sh`)
+web/play/index.html
+web/play/index.js
+web/play/index.wasm
+web/play/index.pck
+web/play/index.png
+web/play/index.icon.png
+web/play/index.apple-touch-icon.png
+web/play/*.worklet.js
+web/play/.nojekyll
+
+# Blender exports are tracked, but Blender's own backups are not
+Blender/**/*.blend1
+
+# macOS
+.DS_Store

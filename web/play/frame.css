@@ -1,0 +1,62 @@
+/* Keep the Godot canvas portrait-first and clear of phone safe areas. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #14343a 0%, #081418 62%, #050d10 100%);
+  color: #f8f1e2;
+  font-family: 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+}
+
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The engine's start overlay is hidden; the game has its own title screen. */
+#status,
+#status-progress,
+#status-notice {
+  font-family: inherit;
+  color: #f8f1e2;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+#status-notice {
+  max-width: 34rem;
+  margin: 1rem auto;
+  border-radius: 1rem;
+  background: rgba(8, 20, 24, 0.92);
+  border: 1px solid rgba(248, 241, 226, 0.18);
+  padding: 1rem 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.lja-root {
+  z-index: 40;
+}
+
+@media (display-mode: standalone) {
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}

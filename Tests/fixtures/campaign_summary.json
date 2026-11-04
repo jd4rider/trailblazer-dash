@@ -1,0 +1,9 @@
+{
+  "levels": 500,
+  "verified": 500,
+  "rejected": 0,
+  "regions": 20,
+  "retries": 7,
+  "bytes": 777288,
+  "levels_per_region": 25
+}
