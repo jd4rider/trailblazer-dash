@@ -1,0 +1,32 @@
+{
+  "id": "trailblazer-dash",
+  "name": "Trailblazer Dash",
+  "tagline": "One world. Five hundred trails. Never stop moving.",
+  "description": "A portrait-first 3D endless runner built in Godot 4 and exported to the web. You are a Trailblazer restoring the Wayfinder Network across Avelora: five hundred campaign trails over twenty regions, a living world map that lights up as you travel, and an endless trail for when you just want to run. Swipe to change lanes, jump the hurdles, slide under the bars, collect Wayfinder Sparks and light the beacon at the end of every trail.",
+  "categories": ["Arcade", "Casual"],
+  "runtime": "Godot 4",
+  "version": "1.0.0",
+  "updated": "2026-11-03",
+  "status": "live",
+  "featured": true,
+  "playUrl": "https://jd4rider.github.io/trailblazer-dash/",
+  "siteUrl": "https://jd4rider.github.io/trailblazer-dash/",
+  "repoUrl": "https://github.com/jd4rider/trailblazer-dash",
+  "downloads": [],
+  "cover": { "from": "#2ec4a6", "to": "#0b1c20", "emoji": "🏃" },
+  "highlights": [
+    "500 campaign trails across 20 regions of Avelora, every layout validated headless before it ships",
+    "A living journey map: cleared trails light the route and reveal the next region",
+    "Blender-authored runner, props and landmarks, with real 3D parallax scenery",
+    "Sparks, relics, power-up crates and a three-star objective on every trail",
+    "Portrait-first swipe controls plus keyboard, built with the Little Joy Arcade account bridge"
+  ],
+  "howToPlay": [
+    "Swipe left or right to change lane, up to jump, down to slide. Arrow keys and WASD work on desktop.",
+    "Tap START RUNNING, then keep moving. A stumble costs your speed and one heart, not the run.",
+    "Collect sparks to meet the objective and finish under the beacon to light the next trail.",
+    "Star two and three need the objective met, not just the finish line."
+  ],
+  "levels": "500 levels · 20 regions + endless and daily",
+  "saveKey": "trailblazer-dash-save-v1"
+}
