@@ -88,6 +88,19 @@ func _test_campaign() -> void:
 	check(float(daily.get("len", 0)) > 300.0, "daily level has a real length")
 
 
+func _mesh_width(node: Node3D) -> float:
+	var out := AABB()
+	var first := true
+	for child in node.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		var box: AABB = mesh_instance.global_transform * mesh_instance.mesh.get_aabb()
+		out = box if first else out.merge(box)
+		first = false
+	return out.size.x
+
+
 func _count_kind(hazards: Array, kind: String) -> int:
 	var total := 0
 	for hazard in hazards:
@@ -98,6 +111,34 @@ func _count_kind(hazards: Array, kind: String) -> int:
 
 ## Trains, pits and the curving trail are built at runtime rather than living in
 ## the campaign JSON, so they get their own checks on real levels.
+func _feet_height(player: Node3D, body: Node3D) -> float:
+	var lowest := 0.0
+	var first := true
+	for child in body.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		var local := player.global_transform.affine_inverse() * mesh_instance.global_transform
+		var box: AABB = local * mesh_instance.mesh.get_aabb()
+		lowest = box.position.y if first else minf(lowest, box.position.y)
+		first = false
+	return lowest
+
+
+## A full-rect Control on the default mouse filter swallowed every swipe on a real
+## phone while every headless assertion still passed.
+func _pointer_blockers(node: Node, point: Vector2) -> Array:
+	var out: Array = []
+	for child in node.get_children():
+		if child is Control:
+			var control := child as Control
+			if control.mouse_filter == Control.MOUSE_FILTER_STOP and not (control is BaseButton):
+				if control.get_global_rect().has_point(point):
+					out.append("%s(%s)" % [control.get_class(), control.name])
+		out.append_array(_pointer_blockers(child, point))
+	return out
+
+
 func _test_track_extras() -> void:
 	var trains := 0
 	var gaps := 0
@@ -119,12 +160,17 @@ func _test_track_extras() -> void:
 			var expected := float(track.call("curve_at", float(hazard["z"]))) + Playfield.lane_x(int(hazard["lane"]))
 			check(absf(expected - float(hazard["x"])) < 0.01,
 				"level %d hazard sits on its lane" % id)
+			var width := _mesh_width(hazard["node"] as Node3D)
+			check(width <= 2.4,
+				"level %d %s fits inside its lane (%.2f m)" % [id, String(hazard["kind"]), width])
 		for i in range(60):
 			var offset := absf(float(track.call("curve_at", -8.0 * i)))
 			check(offset < 14.0, "level %d trail stays inside the playfield" % id)
 		track.queue_free()
 	check(trains > 0, "trains are placed on some levels")
 	check(gaps > 0, "pits are placed on some levels")
+	check(Playfield.LANE_WIDTH >= 2.8, "lanes are wide enough for three columns")
+	check(Playfield.TRACK_WIDTH >= Playfield.LANE_WIDTH * 3.0, "the deck spans all three lanes")
 
 
 func _test_save() -> void:
@@ -181,6 +227,14 @@ func _test_run_scene(mode: String, level_id: int) -> void:
 	# Input mapping: the same touch path a finger takes, so a broken swipe shows
 	# up here rather than only on a phone.
 	var runner = run.get("player")
+	var body = runner.get("model")
+	check(body != null, "%s runner has a model" % mode)
+	if body != null:
+		var feet := _feet_height(runner, body)
+		check(absf(feet) < 0.08, "%s runner's feet touch the trail (%.2f m)" % [mode, feet])
+	var view_size: Vector2 = run.get_viewport().get_visible_rect().size
+	var blockers := _pointer_blockers(hud, Vector2(view_size.x * 0.5, view_size.y * 0.66))
+	check(blockers.is_empty(), "%s HUD lets swipes through (%s)" % [mode, ", ".join(blockers)])
 	check(not bool(runner.get("airborne")), "%s runner starts grounded" % mode)
 	run.call("_pointer", Vector2(220.0, 620.0), true, true)
 	run.call("_pointer_move", Vector2(130.0, 618.0))

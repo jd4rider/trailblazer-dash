@@ -13,6 +13,10 @@ const OBSTACLE_MODELS := {
 	"x": "block_wall",
 	"m": "boulder",
 }
+## Widest an obstacle may be, including its horizontal diagonal so a boulder
+## turned at a random angle still clears the next lane.
+const OBSTACLE_MAX_WIDTH := 2.0
+
 const COLLISION := {
 	"h": {"bottom": 0.0, "top": 1.03},
 	"b": {"bottom": 1.10, "top": 3.0},
@@ -243,7 +247,7 @@ func _build_tiles() -> void:
 
 		var deck := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = Vector3(8.4, 0.9, 13.4)
+		box.size = Vector3(9.4, 0.9, 13.4)
 		deck.mesh = box
 		deck.position = Vector3(0, -0.45, 0)
 		deck.material_override = _tile_materials["tile_ground"]
@@ -254,14 +258,14 @@ func _build_tiles() -> void:
 			var rail_box := BoxMesh.new()
 			rail_box.size = Vector3(0.6, 0.7, 13.4)
 			rail.mesh = rail_box
-			rail.position = Vector3(side * 4.2, 0.1, 0)
+			rail.position = Vector3(side * 4.7, 0.1, 0)
 			rail.material_override = _tile_materials["tile_edge"]
 			tile.add_child(rail)
 
 		# Two dashed dividers make the three lanes readable at a glance. A single
 		# centre stripe made the trail look like one wide lane.
 		if index % 2 == 0:
-			for divider in [-1.3, 1.3]:
+			for divider in [-Playfield.LANE_WIDTH * 0.5, Playfield.LANE_WIDTH * 0.5]:
 				var dash := MeshInstance3D.new()
 				var dash_box := BoxMesh.new()
 				dash_box.size = Vector3(0.24, 0.06, 3.6)
@@ -272,6 +276,33 @@ func _build_tiles() -> void:
 
 		z -= 12.0
 		index += 1
+
+
+func _mesh_bounds(node: Node3D) -> AABB:
+	var out := AABB()
+	var first := true
+	for child in node.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		var local := node.global_transform.affine_inverse() * mesh_instance.global_transform
+		var box: AABB = local * mesh_instance.mesh.get_aabb()
+		out = box if first else out.merge(box)
+		first = false
+	return out
+
+
+## Shrinks a prop that is wider than a lane. Widening the lanes alone was not
+## enough: the imported hurdle and overhead bar are 2.7 m and 3.3 m across.
+func _fit_width(node: Node3D) -> void:
+	var box := _mesh_bounds(node)
+	var span := sqrt(box.size.x * box.size.x + box.size.z * box.size.z)
+	if span < 0.01:
+		return
+	var factor := minf(1.0, OBSTACLE_MAX_WIDTH / span)
+	if factor < 0.999:
+		node.scale.x *= factor
+		node.scale.z *= factor
 
 
 func _build_obstacles() -> void:
@@ -293,11 +324,13 @@ func _build_obstacles() -> void:
 				node.rotation.y = _rng.randf() * TAU
 			if code == "x":
 				node.scale = Vector3(1.0, _rng.randf_range(0.9, 1.1), 1.0)
+			_fit_width(node)
 			_paint(node, Color(String(OBSTACLE_COLORS.get(code, "#8d8477"))))
 			hazards.append({
 				"node": node,
 				"lane": lane,
 				"kind": code,
+				"half": 0.95,
 				"x": node.position.x,
 				"z": world_z,
 				"bottom": float(COLLISION[code]["bottom"]),
@@ -569,6 +602,7 @@ func _spawn_train(lane: int, z: float, length: float) -> void:
 		"node": train,
 		"lane": lane,
 		"kind": "t",
+		"half": 1.25,
 		"x": train.position.x,
 		"z": -z,
 		"len": length,
@@ -623,7 +657,7 @@ func _spawn_gap(z: float) -> void:
 
 	var pit := MeshInstance3D.new()
 	var pit_box := BoxMesh.new()
-	pit_box.size = Vector3(7.9, 0.1, length)
+	pit_box.size = Vector3(9.3, 0.1, length)
 	pit.mesh = pit_box
 	pit.position = Vector3(0, 0.045, -length * 0.5)
 	pit.material_override = _material(Color("#12161d"))
@@ -631,7 +665,7 @@ func _spawn_gap(z: float) -> void:
 
 	var shaft := MeshInstance3D.new()
 	var shaft_box := BoxMesh.new()
-	shaft_box.size = Vector3(7.4, 2.6, length * 0.92)
+	shaft_box.size = Vector3(8.8, 2.6, length * 0.92)
 	shaft.mesh = shaft_box
 	shaft.position = Vector3(0, -1.3, -length * 0.5)
 	shaft.material_override = _material(Color("#0a0d12"))
@@ -640,7 +674,7 @@ func _spawn_gap(z: float) -> void:
 	for lip in [0.0, -length]:
 		var stripe := MeshInstance3D.new()
 		var stripe_box := BoxMesh.new()
-		stripe_box.size = Vector3(7.9, 0.12, 0.4)
+		stripe_box.size = Vector3(9.3, 0.12, 0.4)
 		stripe.mesh = stripe_box
 		stripe.position = Vector3(0, 0.06, lip)
 		stripe.material_override = _material(Color("#ffb347"), 0.75)
@@ -650,6 +684,7 @@ func _spawn_gap(z: float) -> void:
 		"node": node,
 		"lane": 0,
 		"kind": "g",
+		"half": 0.0,
 		"x": node.position.x,
 		"z": -z,
 		"len": length,

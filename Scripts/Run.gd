@@ -155,6 +155,8 @@ func _build_track() -> void:
 
 
 func _build_ui() -> void:
+	if hud != null:
+		return
 	ui_layer = CanvasLayer.new()
 	ui_layer.layer = 8
 	add_child(ui_layer)
@@ -362,7 +364,10 @@ func _check_hazards(player_z: float) -> void:
 		elif absf(z - player_z) > 1.05:
 			continue
 		if not bool(hazard.get("wide", false)):
-			if absf(Playfield.lane_x(int(hazard["lane"])) - lane_offset) > 1.06:
+			# Half the prop's own width plus the runner's shoulder, so a visible
+			# overlap always counts instead of letting him clip through an edge.
+			var reach_x := float(hazard.get("half", 0.95)) + Playfield.PLAYER_SHOULDER
+			if absf(Playfield.lane_x(int(hazard["lane"])) - lane_offset) > reach_x:
 				continue
 		var feet := player.y
 		var head := player.y + player.height()
@@ -510,7 +515,7 @@ func _show_results(success: bool, stars: int, objective_met: bool, unlocked: Arr
 		["Distance", "%d m" % int(distance)],
 		["Time", Ui.format_time(elapsed)],
 	]
-	var title := "Beacon Lit" if success else "The Trail Won"
+	var title := "Beacon Lit" if success else "The Trail Beat You"
 	if mode == "endless":
 		title = "Run Ended"
 		rows = [
@@ -669,14 +674,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("slide"):
 		player.call("slide")
 		get_viewport().set_input_as_handled()
-	elif event is InputEventScreenTouch:
+
+
+## Pointer input is read before the GUI, not after it. A single full-rect Control
+## with the default mouse filter used to swallow every swipe on a real phone, so
+## the runner only responded to the keyboard. Nothing is marked handled here, so
+## the pause button and menus keep working.
+func _input(event: InputEvent) -> void:
+	if state != "running" or _paused:
+		return
+	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
+		if touch.index > 0:
+			return
 		_pointer(touch.position, touch.pressed, true)
 	elif event is InputEventScreenDrag:
-		_pointer_move((event as InputEventScreenDrag).position)
+		var drag := event as InputEventScreenDrag
+		if drag.index > 0:
+			return
+		_pointer_move(drag.position)
 	elif event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
-		# Godot's web build also mirrors a finger as a mouse press; ignore the
+		# Godot's web build mirrors a finger as a mouse press; ignore that
 		# duplicate so one swipe cannot fire twice or reset itself.
 		if button.button_index == MOUSE_BUTTON_LEFT and Time.get_ticks_msec() - _last_touch_ms > 150:
 			_pointer(button.position, button.pressed, false)
@@ -691,7 +710,7 @@ func _pointer(position: Vector2, pressed: bool, is_touch: bool) -> void:
 		_last_touch_ms = Time.get_ticks_msec()
 	if pressed:
 		# The top strip belongs to the HUD: a tap on pause must not also jump.
-		if position.y < 130.0:
+		if position.y < 240.0:
 			_pointer_down = false
 			return
 		_pointer_down = true

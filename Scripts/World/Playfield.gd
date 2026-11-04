@@ -4,8 +4,10 @@ class_name Playfield
 ## Values here are mirrored by Tools/campaign.py (row spacing, action spacing),
 ## so a validated level stays fair at the speed it was validated for.
 
-const LANE_WIDTH := 2.6
-const TRACK_WIDTH := 7.8
+## 2.9 m of pitch per lane, a little wider than the widest obstacle, so two
+## obstacles on neighbouring lanes never visually merge into one wall.
+const LANE_WIDTH := 2.9
+const TRACK_WIDTH := 9.4
 const LANES := [-1, 0, 1]
 
 const GRAVITY := -34.0
@@ -18,6 +20,8 @@ const LANE_CHANGE_SPEED := 16.0
 const STAND_HEIGHT := 1.55
 const SLIDE_HEIGHT := 0.74
 const PLAYER_RADIUS := 0.38
+## Half the modelled body width, used so collisions include his shoulder.
+const PLAYER_SHOULDER := 0.28
 const PLAYER_DEPTH := 0.42
 
 const CAMERA_BASE_FOV := 66.0

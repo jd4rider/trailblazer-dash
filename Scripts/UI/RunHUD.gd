@@ -20,6 +20,7 @@ var _power_key := ""
 var _power_timer := 0.0
 var _flash: Label
 var _flash_tween: Tween
+var _built := false
 
 
 func setup(level: Dictionary, run_mode: String) -> void:
@@ -35,6 +36,9 @@ func setup(level: Dictionary, run_mode: String) -> void:
 
 
 func _build() -> void:
+	if _built:
+		return
+	_built = true
 	# One full-rect column with explicit offsets. Nesting it in a margin and
 	# anchoring that to the top collapsed the whole HUD to minimum width.
 	var column := Ui.vbox(8)
@@ -134,6 +138,16 @@ func _build() -> void:
 	_flash.offset_top = 236
 	_flash.offset_bottom = 300
 	_flash.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# Any non-button Control left on the default mouse filter silently swallows
+	# swipes over the playfield, so the whole HUD is made click-through.
+	_ignore_pointer(self)
+
+
+func _ignore_pointer(node: Node) -> void:
+	for child in node.get_children():
+		if child is Control and not (child is BaseButton):
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ignore_pointer(child)
 	_flash.modulate.a = 0.0
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_flash)
@@ -168,13 +182,13 @@ func update_state(data: Dictionary) -> void:
 	var hearts := int(data.get("hearts", 3))
 	_hearts_label.text = "LIVES %d" % maxi(0, hearts)
 	var powers: Array = data.get("powers", [])
+	# Rebuild only when the badge text actually changes. A timed rebuild churned
+	# nodes many times a second and flooded the console.
 	var key := ""
 	for power in powers:
-		key += String(power["id"]) + ":"
-	_power_timer -= get_process_delta_time()
-	if key != _power_key or _power_timer <= 0.0:
+		key += "%s:%d;" % [String(power["id"]), int(ceil(float(power["time"])))]
+	if key != _power_key:
 		_power_key = key
-		_power_timer = 0.2
 		_rebuild_powers(powers)
 
 

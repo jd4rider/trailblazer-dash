@@ -59,9 +59,28 @@ func _build_model(character_id: String) -> void:
 	# Blender authors the character facing -Y, which becomes +Z in glTF.
 	model.rotation.y = PI
 	add_child(model)
+	# The Blender body is authored with its soles above the origin, so without this
+	# the Trailblazer floats a third of a metre above the trail.
+	model.position.y -= _foot_offset()
 	anim = _find_animation_player(model)
 	if anim:
 		anim.play("Idle")
+
+
+func _foot_offset() -> float:
+	var lowest := 0.0
+	var first := true
+	for child in model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		var local := global_transform.affine_inverse() * mesh_instance.global_transform
+		var box: AABB = local * mesh_instance.mesh.get_aabb()
+		lowest = box.position.y if first else minf(lowest, box.position.y)
+		first = false
+	if absf(lowest) > 2.0:
+		return 0.0
+	return lowest
 
 
 func _find_animation_player(node: Node) -> AnimationPlayer:

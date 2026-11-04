@@ -95,7 +95,14 @@ func show_result(data: Dictionary) -> void:
 func _stat_row(label: String, value: String) -> HBoxContainer:
 	var row := Ui.hbox(8)
 	var left := Ui.label(label, 18, Ui.INK_SOFT)
+	left.autowrap_mode = TextServer.AUTOWRAP_OFF
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
-	row.add_child(Ui.label(value, 20, Ui.INK))
+	var right := Ui.label(value, 20, Ui.INK, HORIZONTAL_ALIGNMENT_RIGHT)
+	# Every other label wraps word-smart, but a wrapping label reports almost no
+	# minimum width. Next to an expanding sibling that collapsed the value to one
+	# character per line, which is how "60" ended up stacked vertically.
+	right.autowrap_mode = TextServer.AUTOWRAP_OFF
+	right.size_flags_horizontal = Control.SIZE_SHRINK_END
+	row.add_child(right)
 	return row
