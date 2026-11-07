@@ -10,9 +10,18 @@ const LANE_WIDTH := 2.9
 const TRACK_WIDTH := 9.4
 const LANES := [-1, 0, 1]
 
-const GRAVITY := -34.0
-const JUMP_VELOCITY := 9.6
+## Jump arc, sized against the obstacles rather than by feel. A hurdle's hit band
+## stops at 1.03 m, so his feet have to be above that for the whole 2.1 m band,
+## which is 0.26 s at the slowest level and 0.16 s at the fastest. These numbers
+## keep him above 1.03 m for 0.55 s and above a pit lip for 0.64 s, leaving about
+## +/-0.2 s of timing slack. The previous -34/9.6 pair cleared the rail for 0.28 s
+## only, i.e. under one frame of slack: jumping at a hurdle still always hit it.
+const GRAVITY := -30.0
+const JUMP_VELOCITY := 11.4
 const DOUBLE_JUMP_FACTOR := 0.94
+## A jump tops out here. Well clear of a 1.03 m hurdle, but under the 2.95 m train
+## roof, so a stacked double jump can never carry him over a train.
+const JUMP_CEILING := 2.4
 const SLIDE_TIME := 0.62
 const LONG_SLIDE_TIME := 0.95
 const LANE_CHANGE_SPEED := 16.0

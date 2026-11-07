@@ -20,6 +20,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_test_campaign()
 	_test_track_extras()
+	_test_jump_clearance()
 	_test_save()
 	await _test_run_scene("campaign", 1)
 	await _test_run_scene("endless", 0)
@@ -173,6 +174,64 @@ func _test_track_extras() -> void:
 	check(Playfield.TRACK_WIDTH >= Playfield.LANE_WIDTH * 3.0, "the deck spans all three lanes")
 	check(Playfield.SWIPE_THRESHOLD >= 44.0, "the swipe threshold is not twitchy")
 	check(Playfield.SWIPE_AXIS_RATIO > 1.0, "a swipe locks to one axis")
+
+
+## The jump has to keep his feet above a hurdle for the whole time the hazard is
+## beside him, with slack a human thumb can use. These numbers are measured from
+## the real integrator, not from the arc above: at -34/9.6 the runner cleared the
+## 1.03 m rail for 0.28 s while the hazard sat beside him for 0.25 s of it, so
+## even a perfectly timed jump still hit the hurdle.
+func _test_jump_clearance() -> void:
+	var fastest := 0.0
+	for entry in Campaign.levels:
+		var range: Array = entry["spd"]
+		fastest = maxf(fastest, float(range[1]))
+	var probe := RunnerPlayer.new()
+	add_child(probe)
+	probe.setup("pip", "grass")
+	probe.reset_state()
+	check(bool(probe.call("jump")), "the runner can jump")
+	var hurdle_frames := 0
+	var pit_frames := 0
+	var apex := 0.0
+	for i in range(180):
+		probe.call("tick", 1.0 / 60.0, fastest)
+		var height := float(probe.get("y"))
+		apex = maxf(apex, height)
+		if height >= 1.03:
+			hurdle_frames += 1
+		if height >= 0.62:
+			pit_frames += 1
+	var over_rail := float(hurdle_frames) / 60.0
+	var over_pit := float(pit_frames) / 60.0
+	# Collision bands: 1.05 m either side of a hurdle row, and a 3 m pit with
+	# 0.7 m of lip either end.
+	var hurdle_cross := 2.1 / fastest
+	var pit_cross := 4.4 / fastest
+	check(over_rail - hurdle_cross >= 0.15,
+		"a jump clears a hurdle with time to spare (%.2f s above the rail, %.2f s to cross at %.1f m/s)"
+			% [over_rail, hurdle_cross, fastest])
+	check(over_pit - pit_cross >= 0.15,
+		"a jump clears a pit with time to spare (%.2f s over the lip, %.2f s to cross)"
+			% [over_pit, pit_cross])
+	check(apex >= 1.6, "a jump gets real air (%.2f m)" % apex)
+	check(Playfield.JUMP_CEILING >= apex, "the ceiling does not clip a single jump (%.2f m)" % apex)
+	check(Playfield.JUMP_CEILING < 2.95, "a jump cannot clear a train roof")
+	# Double jumps stack, so the second one has to be stopped by the lid too.
+	probe.reset_state()
+	probe.call("jump")
+	for i in range(14):
+		probe.call("tick", 1.0 / 60.0, fastest)
+	probe.apply_power("double_jump")
+	probe.call("jump")
+	var stacked := 0.0
+	for i in range(180):
+		probe.call("tick", 1.0 / 60.0, fastest)
+		stacked = maxf(stacked, float(probe.get("y")))
+	check(stacked <= Playfield.JUMP_CEILING + 0.01,
+		"a double jump stops at the ceiling (%.2f m)" % stacked)
+	check(stacked < 2.95, "a double jump cannot clear a train roof (%.2f m)" % stacked)
+	probe.queue_free()
 
 
 func _test_save() -> void:

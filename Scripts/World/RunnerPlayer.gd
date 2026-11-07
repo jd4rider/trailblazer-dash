@@ -175,6 +175,12 @@ func tick(delta: float, speed: float) -> void:
 	if airborne:
 		vy += Playfield.GRAVITY * delta
 		y += vy * delta
+		if y > Playfield.JUMP_CEILING:
+			# Double jumps stack, and without a lid the second one lifted him
+			# over a train roof — the one hazard that is meant to have no way
+			# past it.
+			y = Playfield.JUMP_CEILING
+			vy = minf(vy, 0.0)
 		if y <= 0.0:
 			y = 0.0
 			vy = 0.0
