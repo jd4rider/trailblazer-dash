@@ -21,6 +21,7 @@ func _ready() -> void:
 	_test_campaign()
 	_test_track_extras()
 	_test_jump_clearance()
+	await _test_hurdle_collision()
 	_test_save()
 	await _test_run_scene("campaign", 1)
 	await _test_run_scene("endless", 0)
@@ -232,6 +233,52 @@ func _test_jump_clearance() -> void:
 		"a double jump stops at the ceiling (%.2f m)" % stacked)
 	check(stacked < 2.95, "a double jump cannot clear a train roof (%.2f m)" % stacked)
 	probe.queue_free()
+
+
+## The arc test above only proves the airtime exists. This drives the shipping
+## collision rule with a real hurdle out of the campaign: feet above the rail has
+## to pass, feet on the deck has to count. Before the fix no jump could ever
+## satisfy the first half, because the arc never stayed up long enough.
+func _test_hurdle_collision() -> void:
+	var packed: PackedScene = load("res://Scenes/Run.tscn")
+	if packed == null:
+		check(false, "run scene loads for the hurdle check")
+		return
+	var run := packed.instantiate()
+	run.call("setup", {"mode": "campaign", "level_id": 1})
+	add_child(run)
+	await get_tree().process_frame
+	await get_tree().physics_frame
+	run.call("_start_run")
+	await get_tree().physics_frame
+	var track = run.get("track")
+	var runner = run.get("player")
+	var hurdle: Dictionary = {}
+	for hazard in track.hazards:
+		if String(hazard["kind"]) == "h" and not bool(hazard["hit"]):
+			hurdle = hazard
+			break
+	check(not hurdle.is_empty(), "the opening level has a hurdle to test")
+	if hurdle.is_empty():
+		run.queue_free()
+		return
+	var hazard_z := float(hurdle["z"])
+	var lane := int(hurdle["lane"])
+	# Nothing is awaited between setting the pose and checking it, so the running
+	# physics loop cannot move him between the two.
+	runner.position.x = float(track.call("curve_at", hazard_z)) + Playfield.lane_x(lane)
+	runner.set("lane", lane)
+	runner.set("x", Playfield.lane_x(lane))
+	runner.set("y", 1.25)
+	runner.position.y = 1.25
+	run.call("_check_hazards", hazard_z)
+	check(not bool(hurdle["hit"]), "a jump above the rail clears the hurdle")
+	runner.set("y", 0.0)
+	runner.position.y = 0.0
+	run.call("_check_hazards", hazard_z)
+	check(bool(hurdle["hit"]), "running into the hurdle on foot still counts")
+	run.queue_free()
+	await get_tree().process_frame
 
 
 func _test_save() -> void:
