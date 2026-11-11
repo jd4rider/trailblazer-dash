@@ -25,7 +25,7 @@
   var script = document.currentScript || document.querySelector('script[data-game-id]')
   var GAME_ID = (script && script.dataset.gameId) || window.LJA_GAME_ID || 'unknown'
   var API = (script && script.dataset.supabaseUrl) || window.LJA_SUPABASE_URL || 'https://fqovramltegcfiyebyrt.supabase.co'
-  var ANON = (script && script.dataset.anonKey) || window.LJA_SUPABASE_ANON_KEY || '__LJA_ANON_KEY__'
+  var ANON = (script && script.dataset.anonKey) || window.LJA_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxb3ZyYW1sdGVnY2ZpeWVieXJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODk2ODcsImV4cCI6MjEwOTE2NTY4N30.q4sloqvE4VDSF7WCI2P7G5Wj9rxxi3ZkZTU_wX6M7YI'
   var CONFIGURED = ANON.indexOf('__LJA_') !== 0 && ANON.length > 40
 
   var SESSION_KEY = 'lja:session'
@@ -36,6 +36,19 @@
   var root = null
   var ui = {}
   var busy = false
+
+  // Portal handoff. The catalogue lives on littlejoyarcade.site while every
+  // game runs on its own origin, so a signed-in player would otherwise have to
+  // sign in again inside each game. Those are the only origins whose
+  // `lja:session` messages are trusted; anything else is ignored.
+  var PORTAL_ORIGINS = [
+    'https://littlejoyarcade.site',
+    'https://www.littlejoyarcade.site',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ]
+  var portalOrigin = null
+  var viaPortal = false
 
   function url(path) {
     return API + path
@@ -69,6 +82,52 @@
       localStorage.removeItem(SESSION_KEY)
     } catch (error) {
       /* ignore */
+    }
+  }
+
+  // Tell the portal what this game did, so signing in (or out) here updates the
+  // header on littlejoyarcade.site instead of leaving two separate accounts.
+  function notifyPortal() {
+    if (!portalOrigin || window.parent === window) return
+    try {
+      window.parent.postMessage({ type: 'lja:auth', gameId: GAME_ID, session: loadSession() }, portalOrigin)
+    } catch (error) {
+      /* ignore */
+    }
+  }
+
+  function adoptSession(session) {
+    if (session && session.access_token && session.user) {
+      var current = loadSession()
+      var same = current && current.access_token === session.access_token
+      saveSession(session)
+      viaPortal = true
+      if (!same) statusText = 'Signed in via Little Joy Arcade'
+      render()
+      syncNow('portal')
+      return
+    }
+    if (!session && loadSession()) {
+      clearSession()
+      viaPortal = false
+      statusText = 'Signed out'
+      render()
+    }
+  }
+
+  function listenForPortal() {
+    window.addEventListener('message', function (event) {
+      if (!event.data || event.data.type !== 'lja:session') return
+      if (PORTAL_ORIGINS.indexOf(event.origin) === -1) return
+      portalOrigin = event.origin
+      adoptSession(event.data.session || null)
+    })
+    if (window.parent !== window) {
+      try {
+        window.parent.postMessage({ type: 'lja:ready', gameId: GAME_ID, configured: CONFIGURED }, '*')
+      } catch (error) {
+        /* ignore */
+      }
     }
   }
 
@@ -290,9 +349,11 @@
       })
       if (!res.ok) return { error: data.error_description || data.msg || data.error || 'Sign-in failed' }
       saveSession(data)
+      viaPortal = false
       statusText = 'Signed in'
       render()
       await syncNow('sign-in')
+      notifyPortal()
       return { error: null }
     } catch (error) {
       return { error: 'Could not reach Little Joy Arcade. Check your connection.' }
@@ -315,9 +376,11 @@
       }
       if (data.access_token) {
         saveSession(data)
+        viaPortal = false
         statusText = 'Account created'
         render()
         await syncNow('sign-up')
+        notifyPortal()
         return { error: null, needsConfirmation: false }
       }
       return { error: null, needsConfirmation: true }
@@ -329,8 +392,10 @@
   async function signOut() {
     var session = loadSession()
     clearSession()
+    viaPortal = false
     statusText = 'Signed out — progress stays on this device'
     render()
+    notifyPortal()
     if (session && session.access_token) {
       fetch(url('/auth/v1/logout'), { method: 'POST', headers: headers(session.access_token) }).catch(function () {})
     }
@@ -355,6 +420,9 @@
     ui.signedOut.hidden = !!user
     ui.signedIn.hidden = !user
     ui.who.textContent = user ? user.email || 'Signed in' : ''
+    if (user && viaPortal && !/synced|saved to the cloud|up to date|offline|syncing/i.test(statusText)) {
+      statusText = 'Signed in via Little Joy Arcade'
+    }
     ui.status.textContent = statusText
     ui.toggle.textContent = user ? '✓' : '👤'
     ui.toggle.title = user ? 'Little Joy account — ' + (user.email || 'signed in') : 'Sign in to save across devices'
@@ -504,6 +572,7 @@
       // Never show a button that cannot work.
       return
     }
+    listenForPortal()
     buildUi()
     if (new URLSearchParams(location.search).get('lja') === 'login' || location.hash === '#login') {
       ui.panel.hidden = false
