@@ -88,6 +88,13 @@ func show_result(data: Dictionary) -> void:
 	buttons.add_child(map_button)
 	column.add_child(buttons)
 
+	# Quiet support link: results card only, under the actions.
+	var tip := Ui.button("☕ BUY ME A COFFEE", 15)
+	tip.pressed.connect(func() -> void:
+		Audio.ui_click()
+		TipJar.open())
+	column.add_child(tip)
+
 	modulate.a = 0.0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.25)
 
